@@ -9,6 +9,10 @@ class BotUser(models.Model):
     first_name = models.CharField(_('Name'), max_length=150, blank=True, null=True)
     last_name = models.CharField(_('Surname'), max_length=150, blank=True, null=True)
 
+    def __str__(self):
+        return f'{self.telegram_id}: {self.username}'
+
+
     class Meta:
         verbose_name = 'User of the Bot'
         verbose_name_plural = 'Users of the Bot'
