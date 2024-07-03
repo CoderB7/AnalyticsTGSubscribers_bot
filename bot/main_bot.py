@@ -2,15 +2,26 @@ import telebot
 from telebot.async_telebot import AsyncTeleBot
 from django.conf import settings
 import logging
-
+from bot.middleware import CustomMiddleware
+from telebot.types import Message
+from services.database.telegram_chat_dao import update_telegram_chat
+from services.database.invite_link_dao import update_invite_link, create_public_link
 
 bot = AsyncTeleBot(settings.TOKEN_BOT, parse_mode='HTML')
 telebot.logger.setLevel(settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
+bot.setup_middleware(middleware=CustomMiddleware)
+channels = [-1002150737533]
+
 
 @bot.chat_member_handler()
-async def chat_member_handler_bot(message):
+async def chat_member_handler_bot(message: Message):
+    global channels
+    if message.chat.id:
+        if message.chat.id not in channels:
+            channels.append(message.chat.id)
+    telegram_chat = await update_telegram_chat(chat_data=message.chat)
     status = message.difference.get('status')
     invite_link = message.invite_link
     full_name = message.from_user.full_name
@@ -23,6 +34,10 @@ async def chat_member_handler_bot(message):
         invite_link_url = getattr(invite_link, 'invite_link')
     except AttributeError as err:
         logger.info(f'Did not receive an invite link {err}')
+        await create_public_link(telegram_chat=telegram_chat)
+    else:
+        await update_invite_link(telegram_chat=telegram_chat)
+
     current_subscriber_status = status[1]
     if current_subscriber_status == 'member':
         status_text = '🚀 Subscribed'
@@ -53,13 +68,13 @@ async def chat_member_handler_bot(message):
 async def send_welcome(message):
     text = 'Hello friend'
     await bot.send_message(message.chat.id, text)
-    await bot.send_message(message.chat.id, message.chat.id)
+    # await bot.send_message(message.chat.id, message.chat.id)
 
 
-# Handle all other messages with content_type 'text' (content_types defaults to ['text'])
-@bot.message_handler(func=lambda message: True)
-async def echo_message(message):
-    await bot.reply_to(message, message.text)
+# # Handle all other messages with content_type 'text' (content_types defaults to ['text'])
+# @bot.message_handler(func=lambda message: True)
+# async def echo_message(message):
+#     await bot.reply_to(message, message.text)
 
 
 
